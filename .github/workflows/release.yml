@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.0
+          run_install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Verify tag matches package.json version
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if [ "${GITHUB_REF_NAME}" != "v${VERSION}" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match package.json version ${VERSION}" >&2
+            exit 1
+          fi
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check
+      - name: Pack release artifacts
+        run: |
+          pnpm pack --pack-destination artifacts
+          cp artifacts/dsh-grok-auth-*.tgz artifacts/dsh-grok-auth-latest.tgz
+      - name: Extract changelog section
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { inside = 1; next }
+            inside && /^## \[/ { exit }
+            inside { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "See CHANGELOG.md for details." > release-notes.md
+          fi
+          {
+            echo ""
+            echo "Prebuilt package attached — install without build-script permission:"
+            echo ""
+            echo '```sh'
+            echo "dsh plugin --profile web add https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/dsh-grok-auth-${VERSION}.tgz"
+            echo '```'
+          } >> release-notes.md
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" artifacts/*.tgz \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md

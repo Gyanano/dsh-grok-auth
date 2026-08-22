@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.2] - 2026-08-22
+
+### Added
+
+- Tag-driven release pipeline: pushing a `vX.Y.Z` tag runs the full check,
+  packs the plugin, and publishes a GitHub release with the versioned tarball
+  plus a stable `dsh-grok-auth-latest.tgz` alias, so the README's
+  prebuilt-install link never goes stale. The workflow refuses a tag that
+  does not match `package.json`.
+- README install guidance now leads with the prebuilt release (no
+  build-script permission needed) and gives the exact `allowBuilds` snippet
+  for `github:` source installs.
+
 ## [0.1.1] - 2026-08-22
 
 ### Added

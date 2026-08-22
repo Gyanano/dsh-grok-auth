@@ -78,8 +78,11 @@ GET https://cli-chat-proxy.grok.com/v1/billing?format=credits
 Release 包内含预构建的 Host 与浏览器产物，安装时无需授予构建脚本权限：
 
 ```sh
-dsh plugin --profile web add https://github.com/Gyanano/dsh-grok-auth/releases/download/v0.1.1/dsh-grok-auth-0.1.1.tgz
+dsh plugin --profile web add https://github.com/Gyanano/dsh-grok-auth/releases/latest/download/dsh-grok-auth-latest.tgz
 ```
+
+如需固定到特定版本，请到 [Releases 页](https://github.com/Gyanano/dsh-grok-auth/releases)
+使用对应版本的资产，例如 `releases/download/v0.1.2/dsh-grok-auth-0.1.2.tgz`。
 
 重启 `dsh web`，打开设置，选择 **Grok Auth**。
 
@@ -103,7 +106,7 @@ allowBuilds:
 安装，可固定到 release tag 或 commit：
 
 ```sh
-dsh plugin --profile web add github:Gyanano/dsh-grok-auth#v0.1.1
+dsh plugin --profile web add github:Gyanano/dsh-grok-auth#v0.1.2
 ```
 
 ## 从 tarball 安装
@@ -113,7 +116,7 @@ git clone https://github.com/Gyanano/dsh-grok-auth.git
 cd dsh-grok-auth
 pnpm install
 pnpm pack
-dsh plugin --profile web add ./dsh-grok-auth-0.1.1.tgz
+dsh plugin --profile web add ./dsh-grok-auth-0.1.2.tgz
 ```
 
 重启 `dsh web`，打开设置，选择 **Grok Auth**。

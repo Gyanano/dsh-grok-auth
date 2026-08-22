@@ -87,8 +87,12 @@ The release package includes prebuilt Host and browser bundles, so no
 install-time build permission is required:
 
 ```sh
-dsh plugin --profile web add https://github.com/Gyanano/dsh-grok-auth/releases/download/v0.1.1/dsh-grok-auth-0.1.1.tgz
+dsh plugin --profile web add https://github.com/Gyanano/dsh-grok-auth/releases/latest/download/dsh-grok-auth-latest.tgz
 ```
+
+To pin a specific version, use its versioned asset from the
+[releases page](https://github.com/Gyanano/dsh-grok-auth/releases), e.g.
+`releases/download/v0.1.2/dsh-grok-auth-0.1.2.tgz`.
 
 Restart `dsh web`, open Settings, and select **Grok Auth**.
 
@@ -113,7 +117,7 @@ then run the same command again. Only grant this permission after reviewing
 the source. For a reproducible install, pin a release tag or commit:
 
 ```sh
-dsh plugin --profile web add github:Gyanano/dsh-grok-auth#v0.1.1
+dsh plugin --profile web add github:Gyanano/dsh-grok-auth#v0.1.2
 ```
 
 ## Install a tarball
@@ -123,7 +127,7 @@ git clone https://github.com/Gyanano/dsh-grok-auth.git
 cd dsh-grok-auth
 pnpm install
 pnpm pack
-dsh plugin --profile web add ./dsh-grok-auth-0.1.1.tgz
+dsh plugin --profile web add ./dsh-grok-auth-0.1.2.tgz
 ```
 
 Restart `dsh web`, open Settings, and select **Grok Auth**.
