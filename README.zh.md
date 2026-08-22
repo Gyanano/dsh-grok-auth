@@ -73,16 +73,38 @@ GET https://cli-chat-proxy.grok.com/v1/billing?format=credits
 - `PATH` 上有官方 `grok` CLI（先执行一次 `grok login`），或直接使用
   Grok Auth 卡上的设备码登录。
 
+## 安装预构建 Release（推荐）
+
+Release 包内含预构建的 Host 与浏览器产物，安装时无需授予构建脚本权限：
+
+```sh
+dsh plugin --profile web add https://github.com/Gyanano/dsh-grok-auth/releases/download/v0.1.1/dsh-grok-auth-0.1.1.tgz
+```
+
+重启 `dsh web`，打开设置，选择 **Grok Auth**。
+
 ## 从 GitHub 源码安装
 
 ```sh
 dsh plugin --profile web add github:Gyanano/dsh-grok-auth
 ```
 
-Git 依赖由包的 `prepare` 脚本构建。pnpm 10+ 会先阻止该脚本，首次执行可能
-打印一个 `allowBuilds` 键后停止；把 dsh 打印的确切键复制到
-`~/.dsh/profiles/web/pnpm-workspace.yaml` 的 `allowBuilds` 下，再执行一次。
-请在审阅过源码后再授予该权限。
+Git 依赖由包的 `prepare` 脚本构建，而 pnpm 10+ 默认阻止该脚本——所以
+**首次执行必定报错停止**（`ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED`）。注意
+pnpm 自己的提示写的是 `onlyBuiltDependencies`，但 dsh 读取的允许清单是
+`allowBuilds`。在 `~/.dsh/profiles/web/pnpm-workspace.yaml` 中加入：
+
+```yaml
+allowBuilds:
+  dsh-grok-auth: true
+```
+
+然后重新执行同一条命令即可。请在审阅过源码后再授予该权限。如需可复现
+安装，可固定到 release tag 或 commit：
+
+```sh
+dsh plugin --profile web add github:Gyanano/dsh-grok-auth#v0.1.1
+```
 
 ## 从 tarball 安装
 

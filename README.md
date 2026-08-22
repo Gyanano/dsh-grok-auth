@@ -81,17 +81,40 @@ A failure of any kind degrades to dashes; it never blocks login or requests.
 - Either the official `grok` CLI on `PATH` (run `grok login` once), or use the
   device-code login from the Grok Auth card.
 
+## Install a prebuilt release (recommended)
+
+The release package includes prebuilt Host and browser bundles, so no
+install-time build permission is required:
+
+```sh
+dsh plugin --profile web add https://github.com/Gyanano/dsh-grok-auth/releases/download/v0.1.1/dsh-grok-auth-0.1.1.tgz
+```
+
+Restart `dsh web`, open Settings, and select **Grok Auth**.
+
 ## Install from GitHub source
 
 ```sh
 dsh plugin --profile web add github:Gyanano/dsh-grok-auth
 ```
 
-Git dependencies are built by the package's `prepare` script. pnpm 10+ blocks
-that script until explicitly allowed, so the first command may print an
-`allowBuilds` key and stop; copy the exact key printed by dsh under
-`allowBuilds` in `~/.dsh/profiles/web/pnpm-workspace.yaml`, then run the
-command again. Only grant this permission after reviewing the source.
+Git dependencies are built by the package's `prepare` script, and pnpm 10+
+blocks that script until explicitly allowed — so **the first run is expected
+to stop** with `ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED`. (pnpm's own hint
+mentions `onlyBuiltDependencies`; dsh reads the allowlist from `allowBuilds`
+instead.) Add this to `~/.dsh/profiles/web/pnpm-workspace.yaml`:
+
+```yaml
+allowBuilds:
+  dsh-grok-auth: true
+```
+
+then run the same command again. Only grant this permission after reviewing
+the source. For a reproducible install, pin a release tag or commit:
+
+```sh
+dsh plugin --profile web add github:Gyanano/dsh-grok-auth#v0.1.1
+```
 
 ## Install a tarball
 
