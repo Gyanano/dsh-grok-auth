@@ -19,6 +19,7 @@ import {
 } from '../src/grok-auth.ts'
 import type { GrokAuthEntry, GrokAuthFile } from '../src/grok-auth.ts'
 import { GrokAuthAdapter, GROK_ROUTE, grokAuthInjection } from '../src/grok-auth-adapter.ts'
+import { liveModelName, parseLiveModels } from '../src/grok-models.ts'
 import { GrokAuthService, usageFromPayload } from '../src/grok-auth-service.ts'
 import type { GrokAuthServiceOptions } from '../src/grok-auth-service.ts'
 import { Config as PluginConfig, type Config as PluginConfigView } from '../src/index.ts'
@@ -316,6 +317,28 @@ describe('usageFromPayload', () => {
   })
 })
 
+describe('parseLiveModels / liveModelName', () => {
+  it('maps listing entries, converts prices, and skips imagine and malformed rows', () => {
+    const facts = parseLiveModels({
+      data: [
+        { id: 'grok-4.6', context_length: 500_000, prompt_text_token_price: 20_000 },
+        { id: 'grok-imagine-video' },
+        { id: '' },
+        { context_length: 5 },
+        'not-a-record',
+      ],
+    })
+    expect(facts).toEqual([{ id: 'grok-4.6', contextWindow: 500_000, cost: { input: 2 } }])
+    expect(parseLiveModels(undefined)).toEqual([])
+    expect(parseLiveModels({ data: 'nope' })).toEqual([])
+  })
+
+  it('prettifies discovered model ids', () => {
+    expect(liveModelName('grok-4.6')).toBe('Grok 4.6')
+    expect(liveModelName('grok-4.20-0309-reasoning')).toBe('Grok 4.20 0309 Reasoning')
+  })
+})
+
 describe('plugin Config schema', () => {
   it('defaults every field so a bare row mounts the plugin', () => {
     const parse = PluginConfig as unknown as (input: Partial<PluginConfigView>) => PluginConfigView
@@ -326,6 +349,7 @@ describe('plugin Config schema', () => {
     expect(config.displayName).toBe('xAI Grok (subscription)')
     expect(config.baseUrl).toBe('')
     expect(config.timeoutMs).toBe(120_000)
+    expect(config.liveModels).toBe(true)
   })
 })
 
@@ -340,6 +364,7 @@ describe('GrokAuthAdapter', () => {
       displayName: 'xAI Grok (subscription)',
       baseUrl: '',
       timeoutMs: 120_000,
+      liveModels: false,
     })
     expect(piAiAdapterCalls).toHaveLength(1)
     const options = piAiAdapterCalls[0]!
@@ -358,6 +383,7 @@ describe('GrokAuthAdapter', () => {
       displayName: 'xAI Grok (subscription)',
       baseUrl: 'https://cli-chat-proxy.grok.com/v1',
       timeoutMs: 120_000,
+      liveModels: false,
     })
     const options = piAiAdapterCalls[0]!
     const profile = options.profiles().get(GROK_ROUTE)!
@@ -365,6 +391,57 @@ describe('GrokAuthAdapter', () => {
     for (const model of profile.piProvider.getModels()) {
       expect(model.baseUrl).toBe('https://cli-chat-proxy.grok.com/v1')
     }
+  })
+
+  it('overlays live-discovered models onto the installed catalog', async () => {
+    const ctx = new Context()
+    const listing = {
+      data: [
+        { id: 'grok-4.6', context_length: 500_000, prompt_text_token_price: 20_000, completion_text_token_price: 60_000, cached_prompt_text_token_price: 5_000 },
+        { id: 'grok-4.20-0309-non-reasoning', context_length: 1_000_000 },
+        { id: 'grok-4.3', context_length: 1_000_000 },
+        { id: 'grok-imagine-image' },
+      ],
+    }
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(url)).toBe('https://api.x.ai/v1/models')
+      const headers = new Headers(init?.headers)
+      expect(headers.get('authorization')).toBe('Bearer live-token')
+      return jsonResponse(listing)
+    })
+    const changed = vi.fn()
+    void new GrokAuthAdapter(ctx, {
+      auth: { credential: async () => ({ accessToken: 'live-token' }) },
+      credentialRef: credentialRef('GROK_OAUTH_TOKEN'),
+      displayName: 'xAI Grok (subscription)',
+      baseUrl: '',
+      timeoutMs: 120_000,
+      liveModels: true,
+      onCatalogChange: changed,
+      fetchImpl: fetchImpl as typeof fetch,
+    })
+    const profile = piAiAdapterCalls[0]!.profiles().get(GROK_ROUTE)!
+    // The first read serves the installed catalog and kicks the fetch.
+    const before = profile.piProvider.getModels().map(model => model.id)
+    expect(before).not.toContain('grok-4.6')
+    await vi.waitFor(() => { expect(changed).toHaveBeenCalledTimes(1) })
+    const after = profile.piProvider.getModels()
+    const ids = after.map(model => model.id)
+    expect(ids).toContain('grok-4.6')
+    expect(ids).toContain('grok-4.20-0309-non-reasoning')
+    expect(ids).not.toContain('grok-imagine-image')
+    expect(ids.filter(id => id === 'grok-4.3')).toHaveLength(1)
+    const discovered = after.find(model => model.id === 'grok-4.6')!
+    expect(discovered.name).toBe('Grok 4.6')
+    expect(discovered.contextWindow).toBe(500_000)
+    expect(discovered.cost?.input).toBe(2)
+    expect(discovered.cost?.output).toBe(6)
+    expect(discovered.cost?.cacheRead).toBe(0.5)
+    expect(discovered.api).toBe('openai-completions')
+    const nonReasoning = after.find(model => model.id === 'grok-4.20-0309-non-reasoning')!
+    expect(nonReasoning.reasoning).toBe(false)
+    // One TTL window: repeated catalog reads never re-fetch.
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 
   it('keeps pi-ai credential persistence and ambient discovery inert', async () => {

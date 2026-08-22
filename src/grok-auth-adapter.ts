@@ -24,6 +24,7 @@ import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
 import { LlmError, resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
+import { GrokModelCatalog } from './grok-models.ts'
 import type { GrokAuthService } from './grok-auth-service.ts'
 
 /** The provider route this adapter registers (the installed pi-ai catalog id). */
@@ -82,15 +83,22 @@ export interface GrokAuthAdapterOptions {
   baseUrl: string
   /** Request timeout in milliseconds; zero disables it. */
   timeoutMs: number
+  /** Overlay the installed catalog with the account's live model listing. */
+  liveModels: boolean
+  /** Observe live discovery changing the model set (used to re-announce the route). */
+  onCatalogChange?: (() => void) | undefined
+  /** Injectable transport for the live listing; defaults to the Host's fetch. */
+  fetchImpl?: typeof fetch
 }
 
 /**
  * The installed pi-ai catalog provider for the xai route. Its api-key auth
  * method already accepts a request-level override, which is how the harness
- * token reaches every request; the models are delegated (with an optional
- * endpoint override) so the catalog provider stays the receiver.
+ * token reaches every request; the models are delegated — through the live
+ * discovery overlay when one is active, and with an optional endpoint
+ * override — so the catalog provider stays the receiver.
  */
-function grokProvider(displayName: string, baseUrl: string): Provider {
+function grokProvider(displayName: string, baseUrl: string, catalog: GrokModelCatalog | undefined): Provider {
   const base = builtinProviders().find(candidate => candidate.id === GROK_ROUTE)
   if (base === undefined) {
     throw new Error('llm-grok-auth: the installed pi-ai catalog ships no xai provider')
@@ -101,9 +109,10 @@ function grokProvider(displayName: string, baseUrl: string): Provider {
     name: displayName,
     ...(endpoint ?? base.baseUrl) === undefined ? {} : { baseUrl: endpoint ?? base.baseUrl },
     auth: base.auth,
-    getModels: () => endpoint === undefined
-      ? base.getModels()
-      : base.getModels().map(model => ({ ...model, baseUrl: endpoint })),
+    getModels: () => {
+      const models = catalog === undefined ? base.getModels() : catalog.merge(base.getModels())
+      return endpoint === undefined ? models : models.map(model => ({ ...model, baseUrl: endpoint }))
+    },
     // Delegated rather than copied: the catalog provider stays the receiver,
     // so an implementation holding state on itself keeps working.
     stream: (model, context, options) => base.stream(model, context, options),
@@ -118,6 +127,14 @@ function grokProvider(displayName: string, baseUrl: string): Provider {
  */
 export class GrokAuthAdapter extends PiAiAdapter {
   constructor(ctx: Context, options: GrokAuthAdapterOptions) {
+    const catalog = options.liveModels
+      ? new GrokModelCatalog({
+          resolveAccessToken: async () => (await options.auth.credential())?.accessToken,
+          ...options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl },
+          warn: message => { ctx.logger.warn('llm-grok-auth: %s', message) },
+          ...options.onCatalogChange === undefined ? {} : { onChange: options.onCatalogChange },
+        })
+      : undefined
     const profile: ResolvedPiAiProviderProfile = {
       provider: GROK_ROUTE,
       displayName: options.displayName,
@@ -126,7 +143,7 @@ export class GrokAuthAdapter extends PiAiAdapter {
       requestImagePixelBudget: REQUEST_IMAGE_PIXEL_BUDGET,
       requestImageMaxBytes: REQUEST_IMAGE_MAX_BYTES,
       retryPolicy: resolveRetryPolicy(undefined, `llm-grok-auth: provider "${GROK_ROUTE}" retryPolicy`),
-      piProvider: grokProvider(options.displayName, options.baseUrl),
+      piProvider: grokProvider(options.displayName, options.baseUrl, catalog),
       configuredMaxTokens: new Map(),
       timeoutMs: options.timeoutMs,
     }

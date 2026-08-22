@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.1] - 2026-08-22
+
+### Added
+
+- Live model discovery (`liveModels`, default on): the account's real
+  `GET api.x.ai/v1/models` listing overlays the installed pi-ai catalog, so
+  models the pinned pi-ai version does not ship yet (grok-4.6, the grok-4.20
+  family, …) appear in the selector with live context windows and pricing.
+  Curated catalog entries are never modified; chat-irrelevant
+  `grok-imagine-*` models are skipped, and the route re-announces itself when
+  discovery changes the model set.
+
 ## [0.1.0] - 2026-08-22
 
 ### Added

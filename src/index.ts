@@ -48,6 +48,8 @@ export interface Config {
   baseUrl: string
   /** Request timeout in milliseconds; zero disables it. */
   timeoutMs: number
+  /** Overlay the installed pi-ai catalog with the account's live api.x.ai model listing. */
+  liveModels: boolean
 }
 
 export const Config: z<Config> = z.object({
@@ -59,6 +61,7 @@ export const Config: z<Config> = z.object({
   displayName: z.string().default('xAI Grok (subscription)'),
   baseUrl: z.string().default(''),
   timeoutMs: z.natural().default(DEFAULT_REQUEST_TIMEOUT_MS),
+  liveModels: z.boolean().default(true),
 })
 
 /** Mount the grok-auth adapter and service. */
@@ -82,13 +85,19 @@ export function apply(ctx: Context, config: Config): void {
         + 'remove the conflicting llm-pi-ai providers.xai row (or set llmEnabled: false here)',
       )
     }
-    ctx.llm.registerAdapter([GROK_ROUTE], new GrokAuthAdapter(ctx, {
+    // Live discovery lands after registration, so the announce hook is wired
+    // through a late-bound closure the registration handle then fills in.
+    let announceCatalogChange = (): void => {}
+    const registration = ctx.llm.registerAdapter([GROK_ROUTE], new GrokAuthAdapter(ctx, {
       auth: service,
       credentialRef: credentialReference,
       displayName: config.displayName,
       baseUrl: config.baseUrl,
       timeoutMs: config.timeoutMs,
+      liveModels: config.liveModels,
+      onCatalogChange: () => { announceCatalogChange() },
     }))
+    announceCatalogChange = () => { registration.replace([GROK_ROUTE]) }
   }
   ctx.inject(['connection'], connectionCtx => connectionCtx.connection.rpc.handle(
     GROK_AUTH_RPC_CHANNEL,

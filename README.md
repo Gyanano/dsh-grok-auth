@@ -48,8 +48,19 @@ A self-contained [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harn
 The `xai` route wraps the installed pi-ai `xai` catalog provider
 (`https://api.x.ai/v1`, OpenAI-compatible protocols). The subscription OAuth
 access token is injected per request as the Bearer credential — the same
-construction pi-ai's own xAI subscription login uses. Model catalog, wire
-protocols, tool calls, and streaming all remain provider-owned.
+construction pi-ai's own xAI subscription login uses. Wire protocols, tool
+calls, and streaming all remain provider-owned.
+
+### Live model discovery
+
+The installed pi-ai catalog is a static snapshot pinned by the harness's
+pi-ai version, so newly released Grok models are missing until pi-ai
+upgrades. With `liveModels` on (the default), the plugin overlays the
+account's real `GET api.x.ai/v1/models` listing: chat models the catalog
+does not ship (grok-4.6, the grok-4.20 family, …) are synthesized from a
+curated catalog template with live context windows and pricing, and the
+route re-announces itself when the discovered set changes. Curated entries
+are never modified, and `grok-imagine-*` media models are skipped.
 
 ### Weekly usage
 
@@ -89,7 +100,7 @@ git clone https://github.com/Gyanano/dsh-grok-auth.git
 cd dsh-grok-auth
 pnpm install
 pnpm pack
-dsh plugin --profile web add ./dsh-grok-auth-0.1.0.tgz
+dsh plugin --profile web add ./dsh-grok-auth-0.1.1.tgz
 ```
 
 Restart `dsh web`, open Settings, and select **Grok Auth**.
@@ -115,6 +126,7 @@ State coordinator available without owning an LLM route:
 | `displayName` | `xAI Grok (subscription)` | Provider label in model selectors |
 | `baseUrl` | `''` | Endpoint override; empty keeps the catalog's `api.x.ai/v1` |
 | `timeoutMs` | `120000` | Request timeout in milliseconds (`0` disables it) |
+| `liveModels` | `true` | Overlay the installed catalog with the account's live model listing |
 
 Do not also add an `xai` entry under `llm-pi-ai.providers`; duplicate route
 ownership is rejected with an explicit diagnostic.

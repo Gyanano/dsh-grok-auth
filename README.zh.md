@@ -43,8 +43,17 @@
 
 `xai` 路由包装已安装的 pi-ai `xai` 目录 provider（`https://api.x.ai/v1`，
 OpenAI 兼容协议）。订阅 OAuth access token 逐请求作为 Bearer 凭证注入——
-与 pi-ai 自身 xAI 订阅登录相同的构造。模型目录、线上协议、工具调用与
-流式传输均由 provider 负责。
+与 pi-ai 自身 xAI 订阅登录相同的构造。线上协议、工具调用与流式传输均由
+provider 负责。
+
+### 在线模型发现
+
+pi-ai 内置模型目录是随其版本固定的静态快照，新发布的 Grok 模型要等
+pi-ai 升级才会出现。开启 `liveModels`（默认开启）后，插件会用账号的
+真实 `GET api.x.ai/v1/models` 列表做叠加：目录里缺的聊天模型
+（grok-4.6、grok-4.20 系列等）以目录中精选条目为模板合成，并带上线上
+的上下文窗口和价格；发现的模型集合变化时路由会自动重新公告。精选目录
+条目不会被修改，`grok-imagine-*` 图像/视频模型会被跳过。
 
 ### 周用量
 
@@ -82,7 +91,7 @@ git clone https://github.com/Gyanano/dsh-grok-auth.git
 cd dsh-grok-auth
 pnpm install
 pnpm pack
-dsh plugin --profile web add ./dsh-grok-auth-0.1.0.tgz
+dsh plugin --profile web add ./dsh-grok-auth-0.1.1.tgz
 ```
 
 重启 `dsh web`，打开设置，选择 **Grok Auth**。
@@ -108,6 +117,7 @@ bundle patch 激活一行 Host 配置：
 | `displayName` | `xAI Grok (subscription)` | 模型选择器中的 provider 标签 |
 | `baseUrl` | `''` | 端点覆盖；留空使用目录内置的 `api.x.ai/v1` |
 | `timeoutMs` | `120000` | 请求超时（毫秒，`0` 表示禁用） |
+| `liveModels` | `true` | 用账号的在线模型列表叠加内置目录 |
 
 不要同时在 `llm-pi-ai.providers` 下添加 `xai` 条目；重复的路由所有权会被
 显式诊断并拒绝。
