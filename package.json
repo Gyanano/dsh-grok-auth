@@ -1,0 +1,132 @@
+{
+  "name": "dsh-grok-auth",
+  "description": "DeepSeek Harness plugin that reuses the official Grok CLI login (SuperGrok / X Premium OAuth) for an xai LLM route",
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gyanano/dsh-grok-auth.git"
+  },
+  "homepage": "https://github.com/Gyanano/dsh-grok-auth#readme",
+  "bugs": {
+    "url": "https://github.com/Gyanano/dsh-grok-auth/issues"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh-plugin",
+    "grok",
+    "xai",
+    "oauth",
+    "supergrok"
+  ],
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/*.js",
+    "lib/*.js.map",
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "cordis.patch.yml",
+    "CHANGELOG.md",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.build.host.json && tsc -p tsconfig.build.client.json && tsdown",
+    "bundle": "tsdown",
+    "check": "pnpm run typecheck && pnpm test && pnpm run build && pnpm run package:smoke",
+    "package:smoke": "node scripts/package-smoke.mjs",
+    "prepare": "tsdown",
+    "prepack": "pnpm run build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.host.json --noEmit && tsc -p tsconfig.client.json --noEmit"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-locale"
+      ],
+      "platform": "web"
+    }
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-api-remotes": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-atomic-write": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-connection": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-locale": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-runtime": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-ui-settings": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-credentials": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-host-apiproxy": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-invariants": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-llm": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-llm-pi-ai": "^0.1.1-rc.1",
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "@earendil-works/pi-ai": "^0.82.1",
+    "react": "^18.2.0"
+  },
+  "dependencies": {
+    "undici": "^8.10.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-api-remotes": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-atomic-write": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-connection": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-locale": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-runtime": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-ui-settings": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-credentials": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-host-apiproxy": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-invariants": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-llm": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-llm-pi-ai": "^0.1.1-rc.1",
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "@earendil-works/pi-ai": "^0.82.1",
+    "@types/node": "^22.20.0",
+    "@types/react": "~18.3.31",
+    "lightningcss": "^1.32.0",
+    "react": "^18.3.1",
+    "semver": "^7.8.5",
+    "tsdown": "^0.22.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  }
+}

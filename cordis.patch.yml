@@ -1,0 +1,5 @@
+# One installable Grok Auth bundle: a single Host row owning the shared Grok
+# Login State coordinator and the `xai` LLM route.
+- insert:
+    - id: llm-grok-auth
+      name: 'dsh-grok-auth'
