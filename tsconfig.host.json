@@ -5,8 +5,7 @@
   },
   "include": [
     "src/**/*.ts",
-    "tests/grok-auth.spec.ts",
-    "tests/rpc.spec.ts",
+    "tests/**/*.spec.ts",
     "build/**/*.ts",
     "tsdown.config.ts",
     "vitest.config.ts"

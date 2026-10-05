@@ -144,6 +144,7 @@ export class GrokAuthAdapter extends PiAiAdapter {
       requestImageMaxBytes: REQUEST_IMAGE_MAX_BYTES,
       retryPolicy: resolveRetryPolicy(undefined, `llm-grok-auth: provider "${GROK_ROUTE}" retryPolicy`),
       piProvider: grokProvider(options.displayName, options.baseUrl, catalog),
+      modelErrors: new Map(),
       configuredMaxTokens: new Map(),
       timeoutMs: options.timeoutMs,
     }

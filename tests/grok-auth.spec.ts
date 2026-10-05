@@ -370,8 +370,8 @@ describe('GrokAuthAdapter', () => {
     const options = piAiAdapterCalls[0]!
     const profile = options.profiles().get(GROK_ROUTE)
     expect(profile).toBeDefined()
-    expect(profile!.piProvider.id).toBe(GROK_ROUTE)
-    expect(profile!.piProvider.getModels().length).toBeGreaterThan(0)
+    expect(profile!.piProvider!.id).toBe(GROK_ROUTE)
+    expect(profile!.piProvider!.getModels().length).toBeGreaterThan(0)
     await expect(options.resolveApiKey(GROK_ROUTE, profile!)).rejects.toThrow('no usable Grok login')
   })
 
@@ -388,7 +388,7 @@ describe('GrokAuthAdapter', () => {
     const options = piAiAdapterCalls[0]!
     const profile = options.profiles().get(GROK_ROUTE)!
     await expect(options.resolveApiKey(GROK_ROUTE, profile)).resolves.toBe('live-token')
-    for (const model of profile.piProvider.getModels()) {
+    for (const model of profile.piProvider!.getModels()) {
       expect(model.baseUrl).toBe('https://cli-chat-proxy.grok.com/v1')
     }
   })
@@ -397,7 +397,7 @@ describe('GrokAuthAdapter', () => {
     const ctx = new Context()
     const listing = {
       data: [
-        { id: 'grok-4.6', context_length: 500_000, prompt_text_token_price: 20_000, completion_text_token_price: 60_000, cached_prompt_text_token_price: 5_000 },
+        { id: 'grok-99.0', context_length: 500_000, prompt_text_token_price: 20_000, completion_text_token_price: 60_000, cached_prompt_text_token_price: 5_000 },
         { id: 'grok-4.20-0309-non-reasoning', context_length: 1_000_000 },
         { id: 'grok-4.3', context_length: 1_000_000 },
         { id: 'grok-imagine-image' },
@@ -422,22 +422,22 @@ describe('GrokAuthAdapter', () => {
     })
     const profile = piAiAdapterCalls[0]!.profiles().get(GROK_ROUTE)!
     // The first read serves the installed catalog and kicks the fetch.
-    const before = profile.piProvider.getModels().map(model => model.id)
-    expect(before).not.toContain('grok-4.6')
+    const before = profile.piProvider!.getModels().map(model => model.id)
+    expect(before).not.toContain('grok-99.0')
     await vi.waitFor(() => { expect(changed).toHaveBeenCalledTimes(1) })
-    const after = profile.piProvider.getModels()
+    const after = profile.piProvider!.getModels()
     const ids = after.map(model => model.id)
-    expect(ids).toContain('grok-4.6')
+    expect(ids).toContain('grok-99.0')
     expect(ids).toContain('grok-4.20-0309-non-reasoning')
     expect(ids).not.toContain('grok-imagine-image')
     expect(ids.filter(id => id === 'grok-4.3')).toHaveLength(1)
-    const discovered = after.find(model => model.id === 'grok-4.6')!
-    expect(discovered.name).toBe('Grok 4.6')
+    const discovered = after.find(model => model.id === 'grok-99.0')!
+    expect(discovered.name).toBe('Grok 99.0')
     expect(discovered.contextWindow).toBe(500_000)
     expect(discovered.cost?.input).toBe(2)
     expect(discovered.cost?.output).toBe(6)
     expect(discovered.cost?.cacheRead).toBe(0.5)
-    expect(discovered.api).toBe('openai-completions')
+    expect(discovered.api).toBe(after.find(model => model.id === 'grok-4.3')!.api)
     const nonReasoning = after.find(model => model.id === 'grok-4.20-0309-non-reasoning')!
     expect(nonReasoning.reasoning).toBe(false)
     // One TTL window: repeated catalog reads never re-fetch.

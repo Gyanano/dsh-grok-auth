@@ -5,8 +5,10 @@ import { access, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import semver from 'semver'
+import { evaluatePluginCompatibility } from '@deepseek-ai/dsh-app-boot'
 
 const DSH_BASELINE = '0.1.1-rc.1'
+const DSH_DESKTOP_BASELINE = '0.2.0-rc.2'
 const SEMVER_OPTIONS = { includePrerelease: true }
 const sourceRoot = resolve(import.meta.dirname, '..')
 const temporary = await mkdtemp(resolve(sourceRoot, '.package-smoke-'))
@@ -31,6 +33,7 @@ try {
     throw new Error(`package smoke: CHANGELOG.md lacks release ${String(manifest.version)}`)
   }
   for (const section of ['peerDependencies', 'devDependencies']) {
+    const baseline = section === 'peerDependencies' ? DSH_BASELINE : DSH_DESKTOP_BASELINE
     const entries = Object.entries(manifest[section] ?? {})
       .filter(([name]) => name.startsWith('@deepseek-ai/dsh-'))
     if (entries.length === 0) throw new Error(`package smoke: ${section} declares no DSH packages`)
@@ -39,10 +42,19 @@ try {
       const minimum = parsed === null ? null : semver.minVersion(parsed, SEMVER_OPTIONS)
       if (parsed === null
         || minimum === null
-        || !semver.satisfies(DSH_BASELINE, parsed, SEMVER_OPTIONS)
-        || semver.lt(minimum, DSH_BASELINE)) {
-        throw new Error(`package smoke: ${section}.${name} must accept ${DSH_BASELINE} and exclude every earlier version`)
+        || !semver.satisfies(baseline, parsed, SEMVER_OPTIONS)
+        || semver.lt(minimum, baseline)) {
+        throw new Error(`package smoke: ${section}.${name} must accept ${baseline} and exclude every earlier version`)
       }
+    }
+  }
+  const incompatible = evaluatePluginCompatibility(manifest, {}, DSH_DESKTOP_BASELINE)
+  if (incompatible !== undefined) {
+    throw new Error(`package smoke: desktop installer rejects ${JSON.stringify(incompatible.peers)}`)
+  }
+  for (const removed of ['@deepseek-ai/dsh-client-runtime', '@deepseek-ai/dsh-host-apiproxy']) {
+    if (manifest.dsh?.client?.inject?.includes(removed) || removed in (manifest.peerDependencies ?? {})) {
+      throw new Error(`package smoke: package still requires removed SDK ${removed}`)
     }
   }
   const hostExports = ['.', './invariant']

@@ -31,8 +31,10 @@ A self-contained [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harn
 - Tolerates auth-file field aliases across Grok CLI versions
   (`key`/`access_token`, `refresh_token`/`refresh`, `expires_at`/`expires`)
   and writes back the spelling the file already uses.
-- Sends no token value over the plugin-owned, loopback-only `/grok-auth`
-  Connection RPC channel.
+- Sends no token value over the plugin-owned Connection RPC endpoints.
+  DSH 0.1 uses `/grok-auth` with its loopback policy; DSH 0.2 uses
+  `/api/grok-auth/*` and authenticates calls
+  through the operator Connection.
 
 ### Two login flows, one authority
 
@@ -75,13 +77,39 @@ A failure of any kind degrades to dashes; it never blocks login or requests.
 
 ## Requirements
 
-- DeepSeek Harness `0.1.1-rc.1` or a compatible later `0.1.x` release.
+- DeepSeek Harness Desktop `0.2.0-rc.2` or compatible `0.2.x`, or WebUI
+  `0.1.1-rc.1` and compatible `0.1.x`. Desktop requires plugin `0.1.3` or later.
 - Node.js `^22.19.0` or `>=24.0.0`.
 - A SuperGrok / X Premium subscription.
 - Either the official `grok` CLI on `PATH` (run `grok login` once), or use the
   device-code login from the Grok Auth card.
 
-## Install a prebuilt release (recommended)
+## Install in Desktop
+
+1. Open **Plugins → Add plugin** in DeepSeek Harness Desktop.
+2. Set **Installation source** to the official npm registry (or a working npm
+   mirror). This controls dependency downloads; do not put the release tarball
+   URL in the custom registry field.
+3. Paste this prebuilt package URL into **Package name or address** and click **Install**:
+
+   ```text
+   https://github.com/Gyanano/dsh-grok-auth/releases/download/v0.1.3/dsh-grok-auth-0.1.3.tgz
+   ```
+
+4. Choose **Enable now**. Confirm that `llm-grok-auth` is active, then open
+   **Settings → Grok Auth**.
+
+To upgrade an existing installation, uninstall it, install the new package,
+then quit and reopen DeepSeek Harness. Replacing a package can leave the
+running process using its cached module generation.
+
+The package includes built artifacts, so users need neither a checkout nor a
+local build. For local development, run `pnpm install` and `pnpm pack`, then
+enter the generated tarball's absolute path instead. Desktop manages its own
+profile, so adding a package to the CLI's `web` profile does not install it
+in Desktop. Prebuilt tarballs need no plugin build-script permission.
+
+## Install a prebuilt release in WebUI
 
 The release package includes prebuilt Host and browser bundles, so no
 install-time build permission is required:
@@ -127,7 +155,7 @@ git clone https://github.com/Gyanano/dsh-grok-auth.git
 cd dsh-grok-auth
 pnpm install
 pnpm pack
-dsh plugin --profile web add ./dsh-grok-auth-0.1.2.tgz
+dsh plugin --profile web add ./dsh-grok-auth-0.1.3.tgz
 ```
 
 Restart `dsh web`, open Settings, and select **Grok Auth**.
@@ -166,7 +194,8 @@ ownership is rejected with an explicit diagnostic.
   these are identity/status facts, not credentials.
 - Refresh writes preserve unknown fields and atomically replace the auth file
   with owner-only (`0600`) permissions.
-- The status/login RPC channel is restricted to loopback authorities.
+- DSH 0.1 restricts the status/login RPC channel to loopback authorities.
+  DSH 0.2 authenticates every channel through the operator Connection.
 - The official CLI does not participate in the plugin's writer lock; the
   guarantee is fail-closed recovery (lineage checks, newer-state adoption)
   rather than absolute cross-client serialization.
@@ -178,6 +207,7 @@ ownership is rejected with an explicit diagnostic.
 ```sh
 pnpm install
 pnpm run check
+pnpm run package:install-smoke
 ```
 
 `pnpm run build` emits:

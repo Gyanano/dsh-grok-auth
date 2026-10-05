@@ -1,5 +1,6 @@
 /** Browser half of the Grok Auth bundle. */
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -24,10 +25,11 @@ const NS = 'settings.grokAuth'
 export const inject = ['slots', 'locale', 'connection']
 
 /** Register the Grok Auth settings section. */
-export function apply(ctx: ClientContext): void {
+export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'grok-auth: copy dictionaries')
   const connection = ctx.get('connection') as ConnectionHandle
-  const rpc = createGrokAuthRpcClient(connection.rpc)
+  // Generation state replaced hostDescription in 0.2, whose carriers share /api routes.
+  const rpc = createGrokAuthRpcClient(connection.rpc, 'generation' in connection)
   const t = ctx.locale.bind(NS) as GrokAuthSettingsProps['t']
   const listeners = new Set<() => void>()
   const subscribe = (listener: () => void): (() => void) => {

@@ -46,11 +46,19 @@ jobs:
           fi
           {
             echo ""
-            echo "Prebuilt package attached — install without build-script permission:"
+            echo "## Install in DeepSeek Harness Desktop / 安装到桌面端"
             echo ""
-            echo '```sh'
-            echo "dsh plugin --profile web add https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/dsh-grok-auth-${VERSION}.tgz"
+            echo "Open Plugins → Add plugin. Set the installation source to the official npm registry, paste the following URL into Package name or address, then install and enable the plugin."
+            echo ""
+            echo "打开 插件 → 添加插件，安装源选择 npm 官方源，将下面链接粘贴到 包名或地址，安装后立即启用。"
+            echo ""
+            echo '```text'
+            echo "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/dsh-grok-auth-${VERSION}.tgz"
             echo '```'
+            echo ""
+            echo "The package is prebuilt; no local build or build-script permission is needed. When upgrading an existing installation, uninstall it first, install the new package, then quit and reopen DeepSeek Harness."
+            echo ""
+            echo "安装包已预构建，无需本机编译或构建脚本权限。升级已有安装时，先卸载再安装，并退出、重新打开 DeepSeek Harness。"
           } >> release-notes.md
       - name: Create GitHub release
         env:

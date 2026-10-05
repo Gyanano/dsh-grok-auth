@@ -28,8 +28,9 @@
 - 兼容 Grok CLI 各版本的字段别名（`key`/`access_token`、
   `refresh_token`/`refresh`、`expires_at`/`expires`），写回时沿用文件
   已有的拼写。
-- 插件自有的 `/grok-auth` Connection RPC 通道仅限 loopback，且不携带任何
-  token 值。
+- 插件自有的 Connection RPC 接口不携带任何 token 值。
+  DSH 0.1 使用 `/grok-auth` 的 loopback 策略；DSH 0.2 使用
+  `/api/grok-auth/*`，通过 Connection 的操作者认证。
 
 ### 一个授权来源，两种登录方式
 
@@ -67,13 +68,36 @@ GET https://cli-chat-proxy.grok.com/v1/billing?format=credits
 
 ## 前置要求
 
-- DeepSeek Harness `0.1.1-rc.1` 或兼容的后续 `0.1.x` 版本。
+- DeepSeek Harness 桌面版 `0.2.0-rc.2` 或兼容的 `0.2.x`；也支持 WebUI
+  `0.1.1-rc.1` 及兼容的 `0.1.x`。桌面版需要插件 `0.1.3` 或更新版本。
 - Node.js `^22.19.0` 或 `>=24.0.0`。
 - SuperGrok / X Premium 订阅。
 - `PATH` 上有官方 `grok` CLI（先执行一次 `grok login`），或直接使用
   Grok Auth 卡上的设备码登录。
 
-## 安装预构建 Release（推荐）
+## 安装到桌面版
+
+1. 在 DeepSeek Harness 桌面版打开 **插件 → 添加插件**。
+2. 将 **安装源** 设为 **npm 官方源**（或可用的 npm 镜像）。这里填写的是依赖下载源，
+   不要把 Release 压缩包地址填进自定义安装源。
+3. 在 **包名或地址** 中粘贴以下预构建安装包链接，然后点击 **安装**：
+
+   ```text
+   https://github.com/Gyanano/dsh-grok-auth/releases/download/v0.1.3/dsh-grok-auth-0.1.3.tgz
+   ```
+
+4. 安装后选择 **立即启用**。
+   确认 `llm-grok-auth` 显示为运行中，再打开 **设置 → Grok Auth**。
+
+升级已有安装时，先卸载再安装新包，并退出、重新打开 DeepSeek Harness。
+替换包后，运行中的进程仍可能使用缓存的旧模块。
+
+上述安装包已包含构建产物，使用者无需克隆仓库或在本机编译。
+本地开发时也可以执行 `pnpm install`、`pnpm pack`，再填入生成的 `.tgz` 绝对路径。
+桌面版管理自己的 profile，因此 CLI 安装到 `web` profile 不会装进桌面版。
+预构建 tarball 不需要插件构建脚本权限。
+
+## 安装预构建 Release 到 WebUI
 
 Release 包内含预构建的 Host 与浏览器产物，安装时无需授予构建脚本权限：
 
@@ -116,7 +140,7 @@ git clone https://github.com/Gyanano/dsh-grok-auth.git
 cd dsh-grok-auth
 pnpm install
 pnpm pack
-dsh plugin --profile web add ./dsh-grok-auth-0.1.2.tgz
+dsh plugin --profile web add ./dsh-grok-auth-0.1.3.tgz
 ```
 
 重启 `dsh web`，打开设置，选择 **Grok Auth**。
@@ -154,7 +178,8 @@ bundle patch 激活一行 Host 配置：
 - 状态可能包含 CLI 记录的账户邮箱与登录方式；这些是身份/状态事实，
   不是凭证。
 - 刷新写入保留未知字段，并以仅属主可读写（`0600`）原子替换登录文件。
-- 状态/登录 RPC 通道仅限 loopback。
+- DSH 0.1 的状态/登录 RPC 通道仅限 loopback；DSH 0.2 使用 Connection
+  对所有 RPC 通道实施的操作者认证策略。
 - 官方 CLI 不参与插件的写者锁；保证是 fail-closed 恢复（谱系校验、
   采纳更新状态），而非绝对的跨客户端串行化。
 - 公开 OAuth client id 属于官方 Grok CLI；xAI 未承诺其对第三方长期可用。
@@ -164,6 +189,7 @@ bundle patch 激活一行 Host 配置：
 ```sh
 pnpm install
 pnpm run check
+pnpm run package:install-smoke
 ```
 
 `pnpm run build` 产出：

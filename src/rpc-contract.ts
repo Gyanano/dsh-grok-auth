@@ -1,9 +1,11 @@
 /** Browser-safe dedicated Connection RPC contract owned by grok-auth. */
 
-import type { RpcResult } from '@deepseek-ai/dsh-host-apiproxy/api'
+import type { RpcResult } from '@deepseek-ai/dsh-client-connection/client'
 
 /** Logical channel registered by the plugin's Host half and called by its browser half. */
 export const GROK_AUTH_RPC_CHANNEL = '/grok-auth'
+export const GROK_AUTH_SHARED_RPC_CHANNEL = '/api'
+export const GROK_AUTH_SHARED_RPC_PREFIX = 'grok-auth/'
 
 /**
  * One login flow: `browser` spawns the official `grok login` CLI flow;
@@ -76,22 +78,28 @@ export interface GrokAuthConnectionRpc {
 }
 
 /** Build the browser face over Connection's plugin-owned unary channel. */
-export function createGrokAuthRpcClient(rpc: GrokAuthConnectionRpc): GrokAuthRpcClient {
+export function createGrokAuthRpcClient(rpc: GrokAuthConnectionRpc, sharedApi = false): GrokAuthRpcClient {
+  const call = (endpoint: string, payload: unknown, signal?: AbortSignal) => rpc.call(
+    sharedApi ? GROK_AUTH_SHARED_RPC_CHANNEL : GROK_AUTH_RPC_CHANNEL,
+    sharedApi ? GROK_AUTH_SHARED_RPC_PREFIX + endpoint : endpoint,
+    payload,
+    signal,
+  )
   return {
     status: async (signal) => {
-      const result = await rpc.call(GROK_AUTH_RPC_CHANNEL, 'status', {}, signal)
+      const result = await call('status', {}, signal)
       if (!result.ok) return result
       const status = parseStatusResult(result.value)
       return status === undefined ? invalidResponse('status') : { ok: true, value: { status } }
     },
     usage: async (signal) => {
-      const result = await rpc.call(GROK_AUTH_RPC_CHANNEL, 'usage', {}, signal)
+      const result = await call('usage', {}, signal)
       if (!result.ok) return result
       const usage = parseUsageResult(result.value)
       return usage === undefined ? invalidResponse('usage') : { ok: true, value: { usage } }
     },
     login: async (mode, signal) => {
-      const result = await rpc.call(GROK_AUTH_RPC_CHANNEL, 'login', { mode }, signal)
+      const result = await call('login', { mode }, signal)
       if (!result.ok) return result
       const login = parseLoginResult(result.value)
       return login === undefined ? invalidResponse('login') : { ok: true, value: { login } }

@@ -8,14 +8,17 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import {
-  Button, IconRefreshOutline16, StateDot,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import type { ComponentType, ReactNode } from 'react'
+import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { GrokAuthRpcClient, GrokAuthStatusView, GrokUsageView } from '../rpc-contract.ts'
 import type { GrokAuthKey } from './locales.ts'
 import classes from './GrokAuthSettings.module.css'
+
+const { Button, StateDot } = primitives
+// DSH 0.2 renamed the same refresh icon; retain the 0.1 export as a fallback.
+const RefreshIcon = (Reflect.get(primitives, 'IconRefreshOutlineMedium')
+  ?? Reflect.get(primitives, 'IconRefreshOutline16')) as ComponentType<{ size: number }>
 
 /** Props injected by the client plugin's slot registration. */
 export interface GrokAuthSettingsProps {
@@ -185,7 +188,7 @@ export function GrokAuthSettings({ rpc, t, subscribe }: GrokAuthSettingsProps): 
         <Button
           variant="ghost"
           className={classes.refresh}
-          icon={<IconRefreshOutline16 size={16} />}
+          icon={<RefreshIcon size={16} />}
           disabled={loadState === 'loading'}
           onClick={() => { void load(); void loadUsage() }}
         >

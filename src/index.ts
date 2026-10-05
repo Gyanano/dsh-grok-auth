@@ -25,7 +25,7 @@ import { DEFAULT_REFRESH_LEAD_MS, defaultAuthJsonPath } from './grok-auth.ts'
 import { DEFAULT_REQUEST_TIMEOUT_MS, GROK_ROUTE, GrokAuthAdapter } from './grok-auth-adapter.ts'
 import { GrokAuthService } from './grok-auth-service.ts'
 import { installEnvHttpProxy } from './env-proxy.ts'
-import { GROK_AUTH_RPC_CHANNEL, handleGrokAuthRpc } from './rpc.ts'
+import { registerGrokAuthRpc } from './rpc.ts'
 
 export const name = 'llm-grok-auth'
 export const inject = ['llm']
@@ -99,11 +99,7 @@ export function apply(ctx: Context, config: Config): void {
     }))
     announceCatalogChange = () => { registration.replace([GROK_ROUTE]) }
   }
-  ctx.inject(['connection'], connectionCtx => connectionCtx.connection.rpc.handle(
-    GROK_AUTH_RPC_CHANNEL,
-    (endpoint, payload, signal) => handleGrokAuthRpc(service, endpoint, payload, signal),
-    { authority: 'loopback' },
-  ))
+  ctx.inject(['connection'], connectionCtx => registerGrokAuthRpc(connectionCtx.connection, service))
   if (config.llmEnabled) {
     ctx.logger.info(
       'llm-grok-auth: route %s serving Grok login from %s (request timeout %sms)',

@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.3] - 2026-10-05
+
+### Fixed
+
+- Accept DeepSeek Harness Desktop `0.2.0-rc.2` without a version exemption,
+  while retaining the `0.1.1-rc.1` compatibility range.
+- Replace removed Client Runtime and Host API Proxy SDK references with the
+  renderer's context declarations and Connection's shared RPC result type.
+- Supply the new pi-ai model diagnostic map and support both refresh icon names.
+- Register settings RPC on Connection's shared `/api` carrier in `0.2`, avoiding
+  HTTP 405 when the desktop WebServer is outside the plugin's service scope.
+  Retain the dedicated loopback channel on `0.1`.
+- Test the installer's real version gate and model resolution with the current
+  SDK; validate the version gate on the packed artifact as well.
+
 ## [0.1.2] - 2026-08-22
 
 ### Added
