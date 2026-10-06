@@ -74,7 +74,7 @@ export function grokAuthInjection(): { credentials: CredentialStore; authContext
 /** Options one adapter instance is constructed with. */
 export interface GrokAuthAdapterOptions {
   /** Shared Host-only coordinator used by every authenticated operation. */
-  auth: Pick<GrokAuthService, 'credential'>
+  auth: Pick<GrokAuthService, 'credential'> & Partial<Pick<GrokAuthService, 'credentialError'>>
   /** The credential reference the status card advertises. */
   credentialRef: CredentialRef
   /** Selector label for the route. */
@@ -161,9 +161,12 @@ export class GrokAuthAdapter extends PiAiAdapter {
       resolveApiKey: async () => {
         const credential = await options.auth.credential()
         if (credential === undefined) {
+          if (options.auth.credentialError !== undefined) {
+            throw new LlmError(`llm-grok-auth: ${options.auth.credentialError}; check Settings → Grok Auth`, 'MISSING_CREDENTIAL')
+          }
           throw new LlmError(
             `llm-grok-auth: no usable Grok login for "${GROK_ROUTE}"; run "grok login" (or use the`
-            + ` "${options.credentialRef}" card on the Settings page) to sign in`,
+            + ' Grok Auth card on the Settings page) to sign in',
             'MISSING_CREDENTIAL',
           )
         }

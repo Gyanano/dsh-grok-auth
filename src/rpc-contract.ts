@@ -39,6 +39,8 @@ export interface GrokAuthStatusView {
   pendingLogin?: GrokPendingLoginView
   /** Last device-login failure, when one is worth showing; cleared by the next attempt. */
   lastLoginError?: string
+  credentialError?: string
+  cliError?: string
 }
 
 /** Value-free weekly usage snapshot for the settings login block. */
@@ -116,7 +118,7 @@ function parseStatusResult(value: unknown): GrokAuthStatusView | undefined {
     || typeof status.credentialRef !== 'string'
     || typeof status.authFileExists !== 'boolean'
   ) return undefined
-  for (const key of ['authMode', 'grokVersion', 'tokenExpiresAt', 'createdAt', 'email', 'lastLoginError'] as const) {
+  for (const key of ['authMode', 'grokVersion', 'tokenExpiresAt', 'createdAt', 'email', 'lastLoginError', 'credentialError', 'cliError'] as const) {
     if (status[key] !== undefined && typeof status[key] !== 'string') return undefined
   }
   let pendingLogin: GrokPendingLoginView | undefined
@@ -143,6 +145,8 @@ function parseStatusResult(value: unknown): GrokAuthStatusView | undefined {
     authFileExists: status.authFileExists,
     ...pendingLogin === undefined ? {} : { pendingLogin },
     ...typeof status.lastLoginError === 'string' ? { lastLoginError: status.lastLoginError } : {},
+    ...typeof status.credentialError === 'string' ? { credentialError: status.credentialError } : {},
+    ...typeof status.cliError === 'string' ? { cliError: status.cliError } : {},
   }
 }
 

@@ -93,7 +93,7 @@ A failure of any kind degrades to dashes; it never blocks login or requests.
 3. Paste this prebuilt package URL into **Package name or address** and click **Install**:
 
    ```text
-   https://github.com/Gyanano/dsh-grok-auth/releases/download/v0.1.3/dsh-grok-auth-0.1.3.tgz
+   https://github.com/Gyanano/dsh-grok-auth/releases/download/v0.1.4/dsh-grok-auth-0.1.4.tgz
    ```
 
 4. Choose **Enable now**. Confirm that `llm-grok-auth` is active, then open
@@ -108,6 +108,20 @@ local build. For local development, run `pnpm install` and `pnpm pack`, then
 enter the generated tarball's absolute path instead. Desktop manages its own
 profile, so adding a package to the CLI's `web` profile does not install it
 in Desktop. Prebuilt tarballs need no plugin build-script permission.
+
+### Windows CLI login and troubleshooting
+
+The default `grok` command searches the desktop process's PATH, then
+`%USERPROFILE%\.grok\bin\grok.exe`. An explicit `grokCommand` path remains
+supported. Fully quit and reopen Harness after installing the CLI; closing
+its window may only hide the application.
+
+CLI and device-code login share the auth file. The `oidc` status does not
+identify which flow created it. To switch accounts or perform CLI browser
+login again, fully quit Harness and run `grok logout`, then `grok login --oauth`
+in PowerShell. Reopen Harness and refresh Grok Auth. There is no separate
+plugin logout button. Grok Auth and session errors show sanitized failure
+summaries; do not share tokens or the complete auth file.
 
 ## Install a prebuilt release in WebUI
 
@@ -155,7 +169,7 @@ git clone https://github.com/Gyanano/dsh-grok-auth.git
 cd dsh-grok-auth
 pnpm install
 pnpm pack
-dsh plugin --profile web add ./dsh-grok-auth-0.1.3.tgz
+dsh plugin --profile web add ./dsh-grok-auth-0.1.4.tgz
 ```
 
 Restart `dsh web`, open Settings, and select **Grok Auth**.

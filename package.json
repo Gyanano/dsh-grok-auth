@@ -1,7 +1,7 @@
 {
   "name": "dsh-grok-auth",
   "description": "DeepSeek Harness plugin that reuses the official Grok CLI login (SuperGrok / X Premium OAuth) for an xai LLM route",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "engines": {

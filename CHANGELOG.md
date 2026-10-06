@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.4] - 2026-10-05
+
+### Fixed
+
+- Find the standard Windows `~/.grok/bin/grok.exe` installation when the
+  desktop process does not inherit the terminal's PATH. Preserve explicit
+  command overrides and prefer executables on the inherited PATH.
+- Use the resolved executable for both version probing and browser login,
+  request OAuth explicitly, and wait for the login process to start.
+- Show sanitized credential and CLI failures in Grok Auth settings and
+  include the credential failure in session errors. A failed credential
+  resolution no longer continues to display a green login status.
+- Add a Windows CI job with a real executable probe outside PATH, alongside
+  RPC and desktop compatibility tests.
+
 ## [0.1.3] - 2026-10-05
 
 ### Fixed

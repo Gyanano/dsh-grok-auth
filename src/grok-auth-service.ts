@@ -30,6 +30,7 @@ import type {
   GrokAuthFile, GrokAuthFileVersion, GrokAuthSnapshot, GrokDeviceAuthorization, GrokTokenReply,
 } from './grok-auth.ts'
 import { readBoundedResponseText } from './bounded-response.ts'
+import { resolveGrokCommand } from './grok-cli.ts'
 import type {
   GrokAuthLoginMode, GrokAuthStatusView, GrokLoginStartView, GrokPendingLoginView, GrokUsageView,
 } from './rpc-contract.ts'
@@ -139,7 +140,10 @@ interface PendingDeviceLogin {
  * package's dedicated Connection RPC channel is its only browser transport.
  */
 export class GrokAuthService extends Service {
+  private readonly grokCommand: string
   private grokVersion: string | undefined
+  private cliError: string | undefined
+  private lastCredentialError: string | undefined
   private lastStatus: GrokAuthStatusView | undefined
   private readonly statusListeners = new Set<() => void>()
   private cachedCredential: CachedCredential | undefined
@@ -156,6 +160,7 @@ export class GrokAuthService extends Service {
 
   constructor(ctx: Context, private readonly options: GrokAuthServiceOptions) {
     super(ctx, 'grokAuth')
+    this.grokCommand = resolveGrokCommand(options.grokCommand)
     this.probeGrok()
     this.ctx.effect(() => () => this.disposeOperations(), 'grok-auth: operations')
   }
@@ -199,6 +204,10 @@ export class GrokAuthService extends Service {
   /** Whether the grok CLI resolved at startup (device-code login works without it). */
   get available(): boolean {
     return this.grokVersion !== undefined
+  }
+
+  get credentialError(): string | undefined {
+    return this.lastCredentialError
   }
 
   /** Last locally observed value-free status, when one has been read. */
@@ -314,19 +323,23 @@ export class GrokAuthService extends Service {
     if (mode === 'browser') {
       if (!this.available) {
         throw new Error(
-          `grok-auth: the grok CLI ("${this.options.grokCommand}") is not on PATH; `
+          `grok-auth: the grok CLI ("${this.grokCommand}") could not be started; `
           + 'install it (or use the device-code login) before logging in',
         )
       }
       try {
         const child = (this.options.spawnImpl ?? spawn)(
-          this.options.grokCommand, ['login'], { detached: true, stdio: 'ignore' },
+          this.grokCommand, ['login', '--oauth'], { detached: true, stdio: 'ignore' },
         )
+        await new Promise<void>((resolve, reject) => {
+          child.once('spawn', resolve)
+          child.once('error', reject)
+        })
         child.unref()
         return { started: true }
       } catch (error) {
         throw new Error(
-          `grok-auth: failed to start ${this.options.grokCommand} login: `
+          `grok-auth: failed to start ${this.grokCommand} login: `
           + (error instanceof Error ? error.message : String(error)),
         )
       }
@@ -594,6 +607,9 @@ export class GrokAuthService extends Service {
       cachedAt: Date.now(),
       fileVersion: snapshot.version,
     }
+    this.lastCredentialError = undefined
+    this.statusReadAt = 0
+    this.publishStatus(this.statusFromFile(snapshot.file))
     this.scheduleBackgroundRefresh(snapshot.file)
   }
 
@@ -750,6 +766,8 @@ export class GrokAuthService extends Service {
       ...email === undefined ? {} : { email },
       credentialRef: this.options.credentialRef,
       authFileExists: file !== undefined,
+      ...this.lastCredentialError === undefined ? {} : { credentialError: this.lastCredentialError },
+      ...this.cliError === undefined ? {} : { cliError: this.cliError },
       ...pendingLogin === undefined ? {} : { pendingLogin },
       ...this.lastLoginError === undefined ? {} : { lastLoginError: this.lastLoginError },
     }
@@ -765,7 +783,9 @@ export class GrokAuthService extends Service {
   }
 
   private warnCredentialFailure(message: string, error: unknown): void {
-    this.ctx.logger.warn('grok-auth: %s (%s)', message, safeDiagnostic(error))
+    this.lastCredentialError = `${message} (${safeDiagnostic(error)})`
+    this.statusReadAt = 0
+    this.ctx.logger.warn('grok-auth: %s', this.lastCredentialError)
   }
 
   /**
@@ -822,20 +842,24 @@ export class GrokAuthService extends Service {
         }
         if (spawned && !terminal) await stopSpawned()
       }
-      const finish = (version: string | undefined): void => {
+      const finish = (version: string | undefined, diagnostic?: string): void => {
         if (settled) return
         settled = true
         clearTimeout(timer)
-        if (!this.disposed) this.grokVersion = version
+        if (!this.disposed) {
+          this.grokVersion = version
+          this.cliError = diagnostic
+          this.statusReadAt = 0
+        }
       }
       const timer = setTimeout(() => {
-        finish(undefined)
+        finish(undefined, `CLI version probe timed out after ${PROBE_TIMEOUT_MS}ms`)
         void stop()
       }, PROBE_TIMEOUT_MS)
       timer.unref?.()
       try {
         child = (this.options.spawnImpl ?? spawn)(
-          this.options.grokCommand, ['--version'], { stdio: ['ignore', 'pipe', 'pipe'] },
+          this.grokCommand, ['--version'], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
         )
         let output = ''
         child.stdout?.on('data', (chunk) => { output += String(chunk) })
@@ -845,19 +869,20 @@ export class GrokAuthService extends Service {
           resolveSpawnOutcome()
           if (stopRequested) void stopSpawned()
         })
-        child.on('error', () => {
-          finish(undefined)
+        child.on('error', error => {
+          finish(undefined, `Could not start ${this.grokCommand}: ${safeDiagnostic(error)}`)
           if (spawned) void stopSpawned()
           else markTerminal()
         })
         child.on('close', (code) => {
           markTerminal()
           const line = code === 0 ? output.trim().split('\n')[0] : undefined
-          finish(typeof line === 'string' && line.length > 0 ? line : undefined)
+          const version = typeof line === 'string' && line.length > 0 ? line : undefined
+          finish(version, version === undefined ? `CLI version probe exited with code ${String(code)}` : undefined)
         })
-      } catch {
+      } catch (error) {
         markTerminal()
-        finish(undefined)
+        finish(undefined, `Could not start ${this.grokCommand}: ${safeDiagnostic(error)}`)
       }
       return async () => {
         settled = true
@@ -967,10 +992,26 @@ function safeDiagnostic(error: unknown): string {
   // only an error class and an optional HTTP status rather than guessing which
   // opaque strings are secret.
   const name = error instanceof Error && error.name.length > 0 ? error.name : 'Error'
+  let cause: unknown = error
+  let code: string | undefined
+  for (let depth = 0; depth < 4 && isRecord(cause); depth++) {
+    if (typeof cause.code === 'string' && SAFE_ERROR_CODES.has(cause.code)) {
+      code = cause.code
+      break
+    }
+    cause = cause.cause
+  }
+  const summary = code === undefined ? name.slice(0, 80) : `${name.slice(0, 64)} (${code})`
   const message = error instanceof Error ? error.message : ''
+  if (message.startsWith('atomic-write: timed out waiting for the writer lock at ')) return `${summary} (LOCK_TIMEOUT)`
   const status = /(?:HTTP\s*)?([45]\d\d)\b/iu.exec(message)?.[1]
-  return status === undefined ? name.slice(0, 80) : `${name.slice(0, 64)} (HTTP ${status})`
+  return status === undefined ? summary : `${summary} (HTTP ${status})`
 }
+
+const SAFE_ERROR_CODES = new Set([
+  'ENOENT', 'EACCES', 'EPERM', 'EBUSY', 'EEXIST', 'ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'EAI_AGAIN',
+  'UND_ERR_CONNECT_TIMEOUT', 'CERT_HAS_EXPIRED', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+])
 
 function sameStatus(left: GrokAuthStatusView | undefined, right: GrokAuthStatusView): boolean {
   if (left === undefined) return false
@@ -986,6 +1027,8 @@ function sameStatus(left: GrokAuthStatusView | undefined, right: GrokAuthStatusV
     && left.pendingLogin?.userCode === right.pendingLogin?.userCode
     && left.pendingLogin?.expiresAt === right.pendingLogin?.expiresAt
     && left.lastLoginError === right.lastLoginError
+    && left.credentialError === right.credentialError
+    && left.cliError === right.cliError
 }
 
 function waitForSettlement(task: Promise<void>, timeoutMs: number): Promise<boolean> {

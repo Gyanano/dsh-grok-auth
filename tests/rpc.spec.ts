@@ -106,6 +106,19 @@ describe('handleGrokAuthRpc', () => {
 })
 
 describe('createGrokAuthRpcClient', () => {
+  it('retains failure diagnostics while excluding credential values', async () => {
+    const diagnostic = {
+      ...status, credentialError: 'token refresh failed (Error (HTTP 400))',
+      cliError: 'Could not start grok: Error (ENOENT)', accessToken: 'secret-canary',
+    }
+    const client = createGrokAuthRpcClient({ call: async () => ({ ok: true, value: { status: diagnostic } }) })
+    const result = await client.status()
+    expect(result).toEqual({ ok: true, value: { status: {
+      ...status, credentialError: diagnostic.credentialError, cliError: diagnostic.cliError,
+    } } })
+    expect(JSON.stringify(result)).not.toContain('secret-canary')
+  })
+
   it('round-trips Host replies through the parsing client', async () => {
     const rpc = {
       call: vi.fn(async (_channel: string, endpoint: string) => {

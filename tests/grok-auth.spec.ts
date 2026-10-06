@@ -535,6 +535,16 @@ describe('GrokAuthService', () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ error: 'invalid_grant' }, 400))
     const service = makeService({ fetchImpl: fetchImpl as typeof fetch })
     await expect(service.credential()).resolves.toBeUndefined()
+    expect((await service.status()).credentialError).toContain('HTTP 400')
+    void new GrokAuthAdapter(ctx, {
+      auth: service, credentialRef: credentialRef('GROK_OAUTH_TOKEN'),
+      displayName: 'Grok', baseUrl: '', timeoutMs: 120_000, liveModels: false,
+    })
+    const options = piAiAdapterCalls.at(-1)!
+    await expect(options.resolveApiKey(GROK_ROUTE, options.profiles().get(GROK_ROUTE)!)).rejects.toThrow('HTTP 400')
+    await writeAuthFile(path, cliFile())
+    await expect(service.credential()).resolves.toBeDefined()
+    expect((await service.status()).credentialError).toBeUndefined()
   })
 
   it('rejects browser login when the CLI probe failed and reuses a pending device login', async () => {
@@ -551,13 +561,27 @@ describe('GrokAuthService', () => {
       return jsonResponse({ error: 'authorization_pending' }, 400)
     })
     const service = makeService({ fetchImpl: fetchImpl as typeof fetch })
-    await expect(service.login('browser')).rejects.toThrow('not on PATH')
+    await expect(service.login('browser')).rejects.toThrow('could not be started')
     const first = await service.login('device')
     expect(first).toMatchObject({ started: true, userCode: 'ABCD-1234' })
     const second = await service.login('device')
     expect(second.userCode).toBe('ABCD-1234')
     const status = await service.status()
     expect(status.pendingLogin?.userCode).toBe('ABCD-1234')
+  })
+
+  it('reports a refresh transport error without exposing its message or token', async () => {
+    await writeAuthFile(join(directory, 'auth.json'), cliFile({
+      key: fakeJwt(Math.floor(Date.now() / 1000) - 60),
+      expires_at: new Date(Date.now() - 60_000).toISOString(),
+    }))
+    const service = makeService({ fetchImpl: (async () => {
+      throw new TypeError('secret-token-canary', { cause: Object.assign(new Error('secret-token-canary'), { code: 'ETIMEDOUT' }) })
+    }) as typeof fetch })
+    await expect(service.credential()).resolves.toBeUndefined()
+    const status = await service.status()
+    expect(status.credentialError).toContain('ETIMEDOUT')
+    expect(JSON.stringify(status)).not.toContain('secret-token-canary')
   })
 
   it('adopts approved device tokens into the auth file', async () => {

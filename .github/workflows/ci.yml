@@ -9,6 +9,21 @@ permissions:
   contents: read
 
 jobs:
+  windows-cli:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.0
+          run_install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm exec vitest run tests/grok-cli.spec.ts tests/compatibility.spec.ts tests/rpc.spec.ts
   check:
     runs-on: ubuntu-latest
     steps:

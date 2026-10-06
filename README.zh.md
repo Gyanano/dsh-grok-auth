@@ -83,7 +83,7 @@ GET https://cli-chat-proxy.grok.com/v1/billing?format=credits
 3. 在 **包名或地址** 中粘贴以下预构建安装包链接，然后点击 **安装**：
 
    ```text
-   https://github.com/Gyanano/dsh-grok-auth/releases/download/v0.1.3/dsh-grok-auth-0.1.3.tgz
+   https://github.com/Gyanano/dsh-grok-auth/releases/download/v0.1.4/dsh-grok-auth-0.1.4.tgz
    ```
 
 4. 安装后选择 **立即启用**。
@@ -96,6 +96,24 @@ GET https://cli-chat-proxy.grok.com/v1/billing?format=credits
 本地开发时也可以执行 `pnpm install`、`pnpm pack`，再填入生成的 `.tgz` 绝对路径。
 桌面版管理自己的 profile，因此 CLI 安装到 `web` profile 不会装进桌面版。
 预构建 tarball 不需要插件构建脚本权限。
+
+### Windows CLI 登录与排障
+
+默认命令 `grok` 会先查找桌面进程的 PATH，再查找
+`%USERPROFILE%\.grok\bin\grok.exe`。也可以在插件配置的 `grokCommand`
+中指定完整 exe 路径。安装 CLI 后完全退出并重新打开 Harness，关闭窗口可能只是隐藏应用。
+
+CLI 与插件设备码登录共用登录文件，设置中的 `oidc` 无法区分这两种登录来源。
+切换账号或重新执行 CLI 浏览器登录时，先完全退出 Harness，再在 PowerShell 执行：
+
+```powershell
+grok logout
+grok login --oauth
+```
+
+然后重新打开 Harness，在 Grok Auth 中刷新状态。插件没有单独的退出登录按钮。
+Grok Auth 会显示经过脱敏的 CLI 启动、凭证读取或刷新失败原因；会话报错也包含
+凭证失败摘要。不要分享 token 或 `auth.json` 的完整内容。
 
 ## 安装预构建 Release 到 WebUI
 
@@ -140,7 +158,7 @@ git clone https://github.com/Gyanano/dsh-grok-auth.git
 cd dsh-grok-auth
 pnpm install
 pnpm pack
-dsh plugin --profile web add ./dsh-grok-auth-0.1.3.tgz
+dsh plugin --profile web add ./dsh-grok-auth-0.1.4.tgz
 ```
 
 重启 `dsh web`，打开设置，选择 **Grok Auth**。

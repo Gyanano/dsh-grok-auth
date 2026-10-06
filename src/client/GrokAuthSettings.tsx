@@ -71,13 +71,16 @@ export function GrokAuthSettings({ rpc, t, subscribe }: GrokAuthSettingsProps): 
     setUsageBusy(true)
     try {
       const result = await rpc.usage()
-      if (result.ok) setUsage(result.value.usage)
+      if (result.ok) {
+        setUsage(result.value.usage)
+        await load()
+      }
     } catch {
       /* usage facts are optional */
     } finally {
       setUsageBusy(false)
     }
-  }, [rpc])
+  }, [rpc, load])
 
   useEffect(() => { void load(); void loadUsage() }, [load, loadUsage, tick])
 
@@ -132,7 +135,7 @@ export function GrokAuthSettings({ rpc, t, subscribe }: GrokAuthSettingsProps): 
             <StateDot state={state} />
             <span className={classes.statusLabel}>{stateLabel}</span>
           </span>
-          {loadState === 'ready' && status?.configured === true
+          {loadState === 'ready' && status?.configured === true && status.credentialError === undefined
             ? <span className={classes.statusSummary}>{t('statusAvailable')}</span>
             : null}
         </div>
@@ -200,7 +203,8 @@ export function GrokAuthSettings({ rpc, t, subscribe }: GrokAuthSettingsProps): 
       {status?.lastLoginError === undefined || error !== null
         ? null
         : <p className={classes.error} role="alert">{status.lastLoginError}</p>}
-      {status !== null && !status.available ? <p className={classes.hint}>{t('cliMissing')}</p> : null}
+      {status?.credentialError === undefined ? null : <p className={classes.error} role="alert">{status.credentialError}</p>}
+      {status !== null && !status.available ? <p className={classes.hint}>{t('cliMissing')} {status.cliError}</p> : null}
       {status?.available === true && !status.configured && status.pendingLogin === undefined
         ? <p className={classes.hint}>{t('loginHint')}</p>
         : null}
@@ -242,6 +246,7 @@ function stateOf(loadState: LoadState, status: GrokAuthStatusView | null): State
   if (loadState === 'loading') return 'ongoing'
   if (loadState === 'error' || status === null) return 'error'
   if (status.pendingLogin !== undefined) return 'ongoing'
+  if (status.credentialError !== undefined) return 'error'
   if (status.configured) return 'done'
   return 'warning'
 }
@@ -254,6 +259,7 @@ function stateText(
   if (loadState === 'loading') return t('refreshing')
   if (loadState === 'error' || status === null) return t('statusFailed')
   if (status.pendingLogin !== undefined) return t('deviceCodeWaiting')
+  if (status.credentialError !== undefined) return t('credentialFailed')
   if (status.configured) return t('loggedIn')
   return status.authFileExists ? t('loggedOut') : t('authFileMissing')
 }
