@@ -24,7 +24,7 @@ import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
 import { DEFAULT_REFRESH_LEAD_MS, defaultAuthJsonPath } from './grok-auth.ts'
 import { DEFAULT_REQUEST_TIMEOUT_MS, GROK_ROUTE, GrokAuthAdapter } from './grok-auth-adapter.ts'
 import { GrokAuthService } from './grok-auth-service.ts'
-import { installEnvHttpProxy } from './env-proxy.ts'
+import { installHttpProxy } from './env-proxy.ts'
 import { registerGrokAuthRpc } from './rpc.ts'
 
 export const name = 'llm-grok-auth'
@@ -50,6 +50,10 @@ export interface Config {
   timeoutMs: number
   /** Overlay the installed pi-ai catalog with the account's live api.x.ai model listing. */
   liveModels: boolean
+  /** Explicit HTTP(S) proxy; empty uses the environment, then Windows settings. */
+  proxyUrl: string
+  /** Read current-user Windows static proxy settings when no proxy is specified. */
+  systemProxy: boolean
 }
 
 export const Config: z<Config> = z.object({
@@ -62,13 +66,13 @@ export const Config: z<Config> = z.object({
   baseUrl: z.string().default(''),
   timeoutMs: z.natural().default(DEFAULT_REQUEST_TIMEOUT_MS),
   liveModels: z.boolean().default(true),
+  proxyUrl: z.string().default(''),
+  systemProxy: z.boolean().default(true),
 })
 
 /** Mount the grok-auth adapter and service. */
-export function apply(ctx: Context, config: Config): void {
-  // Without this, Node's fetch ignores the machine's HTTP proxy env and the
-  // auth.x.ai / api.x.ai backends are unreachable on proxied networks.
-  installEnvHttpProxy((message) => { ctx.logger.warn(String(message)) })
+export async function apply(ctx: Context, config: Config): Promise<void> {
+  await ctx.effect(() => installHttpProxy(message => { ctx.logger.info(message) }, config))
   const credentialReference: CredentialRef = credentialRef(config.credentialRef)
   const authJsonPath = config.authJsonPath.length > 0 ? config.authJsonPath : defaultAuthJsonPath()
   const service = new GrokAuthService(ctx, {

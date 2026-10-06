@@ -23,7 +23,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
-      - run: pnpm exec vitest run tests/grok-cli.spec.ts tests/compatibility.spec.ts tests/rpc.spec.ts
+      - run: pnpm exec vitest run tests/grok-cli.spec.ts tests/proxy.spec.ts tests/compatibility.spec.ts tests/rpc.spec.ts
   check:
     runs-on: ubuntu-latest
     steps:

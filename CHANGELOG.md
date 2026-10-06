@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.5] - 2026-10-05
+
+### Added
+
+- Read the current user's enabled Windows static system proxy when no
+  HTTP_PROXY / HTTPS_PROXY is configured, allowing Desktop model and OAuth
+  requests to use tools such as Clash Verge without TUN mode.
+- Add `proxyUrl` for an explicit HTTP(S) proxy and `systemProxy` (default true)
+  to control Windows discovery. Explicit configuration takes precedence over
+  environment variables, which retain precedence over system settings.
+- Support shared and per-protocol Windows proxy addresses, wildcard bypasses,
+  and `<local>`. Keep loopback requests direct and preserve NO_PROXY behavior.
+- Initialize routing before auth/model services and restore the previous host
+  dispatcher when the plugin unloads. Proxy diagnostics omit addresses and
+  credentials. PAC/WPAD automatic configuration remains unsupported.
+- Test native HTTP and HTTPS requests through a local proxy, plus real
+  PowerShell registry reads and HTTPS routing on Windows CI.
+
 ## [0.1.4] - 2026-10-05
 
 ### Fixed

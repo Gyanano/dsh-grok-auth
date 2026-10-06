@@ -93,7 +93,7 @@ A failure of any kind degrades to dashes; it never blocks login or requests.
 3. Paste this prebuilt package URL into **Package name or address** and click **Install**:
 
    ```text
-   https://github.com/Gyanano/dsh-grok-auth/releases/download/v0.1.4/dsh-grok-auth-0.1.4.tgz
+   https://github.com/Gyanano/dsh-grok-auth/releases/download/v0.1.5/dsh-grok-auth-0.1.5.tgz
    ```
 
 4. Choose **Enable now**. Confirm that `llm-grok-auth` is active, then open
@@ -122,6 +122,31 @@ login again, fully quit Harness and run `grok logout`, then `grok login --oauth`
 in PowerShell. Reopen Harness and refresh Grok Auth. There is no separate
 plugin logout button. Grok Auth and session errors show sanitized failure
 summaries; do not share tokens or the complete auth file.
+
+### Windows system proxy
+
+Version `0.1.5` automatically reads the current user's enabled Windows static
+system proxy. For Clash Verge, enable **System Proxy**, verify the HTTP/mixed
+port (for example `7897`), then fully quit and reopen Harness. TUN mode and
+launching Desktop from a shell with proxy variables are unnecessary for this path.
+
+Priority is `proxyUrl` → `HTTP_PROXY` / `HTTPS_PROXY` (lowercase names win) →
+Windows system settings. `HTTP_PROXY` remains the fallback for HTTPS, and
+`NO_PROXY` / `no_proxy` still apply. Windows supports shared or per-protocol
+addresses (`http=…;https=…`), semicolon-separated bypasses, `*` wildcards and
+`<local>`. Localhost, IPv4 loopback and `::1` always remain direct for Desktop's
+internal communication.
+
+Settings are read when the plugin starts; restart Harness after changing them.
+PAC scripts and WPAD discovery are unsupported. Use a static system proxy or
+set `proxyUrl` to an HTTP(S) address such as `http://127.0.0.1:7897` instead.
+Set `systemProxy: false` to disable discovery.
+
+Routing applies to native fetch in the Harness Host, covering OAuth, model
+discovery, usage and inference, and may also affect other plugins using native
+fetch in that process. The plugin does not change Windows proxy settings and
+restores its previous dispatcher on unload if it still owns it. Diagnostics
+record only the proxy source, never its address or credentials.
 
 ## Install a prebuilt release in WebUI
 
@@ -169,7 +194,7 @@ git clone https://github.com/Gyanano/dsh-grok-auth.git
 cd dsh-grok-auth
 pnpm install
 pnpm pack
-dsh plugin --profile web add ./dsh-grok-auth-0.1.4.tgz
+dsh plugin --profile web add ./dsh-grok-auth-0.1.5.tgz
 ```
 
 Restart `dsh web`, open Settings, and select **Grok Auth**.
@@ -196,6 +221,8 @@ State coordinator available without owning an LLM route:
 | `baseUrl` | `''` | Endpoint override; empty keeps the catalog's `api.x.ai/v1` |
 | `timeoutMs` | `120000` | Request timeout in milliseconds (`0` disables it) |
 | `liveModels` | `true` | Overlay the installed catalog with the account's live model listing |
+| `proxyUrl` | `''` | HTTP(S) proxy; empty uses environment variables, then Windows static settings |
+| `systemProxy` | `true` | Discover the current user's Windows static proxy; no effect on macOS/Linux |
 
 Do not also add an `xai` entry under `llm-pi-ai.providers`; duplicate route
 ownership is rejected with an explicit diagnostic.

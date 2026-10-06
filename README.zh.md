@@ -83,7 +83,7 @@ GET https://cli-chat-proxy.grok.com/v1/billing?format=credits
 3. 在 **包名或地址** 中粘贴以下预构建安装包链接，然后点击 **安装**：
 
    ```text
-   https://github.com/Gyanano/dsh-grok-auth/releases/download/v0.1.4/dsh-grok-auth-0.1.4.tgz
+   https://github.com/Gyanano/dsh-grok-auth/releases/download/v0.1.5/dsh-grok-auth-0.1.5.tgz
    ```
 
 4. 安装后选择 **立即启用**。
@@ -114,6 +114,26 @@ grok login --oauth
 然后重新打开 Harness，在 Grok Auth 中刷新状态。插件没有单独的退出登录按钮。
 Grok Auth 会显示经过脱敏的 CLI 启动、凭证读取或刷新失败原因；会话报错也包含
 凭证失败摘要。不要分享 token 或 `auth.json` 的完整内容。
+
+### Windows 系统代理
+
+插件 `0.1.5` 起默认读取当前用户启用的 Windows 静态系统代理。使用 Clash Verge 时，
+开启 **系统代理**，确认 HTTP／混合端口为 `7897`，再完全退出、重新打开 Harness。
+无需仅为插件开启 TUN 模式，也无需从设置代理变量的 PowerShell 启动桌面端。
+
+代理来源优先级：插件 `proxyUrl` → `HTTP_PROXY`／`HTTPS_PROXY`
+（同名小写变量优先）→ Windows 系统代理。`HTTP_PROXY` 可作为 HTTPS 的回退；
+`NO_PROXY`／`no_proxy` 仍然生效。Windows 支持统一地址或 `http=…;https=…`
+分协议地址、分号分隔的绕过列表、`*` 通配符与 `<local>`。localhost、IPv4
+loopback 和 `::1` 始终直连，保护桌面端内部通信。
+
+系统配置在插件启动时读取，修改后需重新启动 Harness。设置了 PAC 脚本或自动发现
+（WPAD）时，本版本不会解析它们；请使用静态系统代理，或设置 `proxyUrl`，例如
+`http://127.0.0.1:7897`。`systemProxy: false` 可关闭自动读取。
+
+代理作用于 Harness Host 的原生 fetch 请求，包括 OAuth、模型发现、用量与模型请求，
+也可能影响同一 Host 中其他使用原生 fetch 的插件。插件不会修改 Windows 代理配置，
+卸载时会恢复仍由本插件持有的请求调度器。日志只记录代理来源，不记录地址或密码。
 
 ## 安装预构建 Release 到 WebUI
 
@@ -158,7 +178,7 @@ git clone https://github.com/Gyanano/dsh-grok-auth.git
 cd dsh-grok-auth
 pnpm install
 pnpm pack
-dsh plugin --profile web add ./dsh-grok-auth-0.1.4.tgz
+dsh plugin --profile web add ./dsh-grok-auth-0.1.5.tgz
 ```
 
 重启 `dsh web`，打开设置，选择 **Grok Auth**。
@@ -185,6 +205,8 @@ bundle patch 激活一行 Host 配置：
 | `baseUrl` | `''` | 端点覆盖；留空使用目录内置的 `api.x.ai/v1` |
 | `timeoutMs` | `120000` | 请求超时（毫秒，`0` 表示禁用） |
 | `liveModels` | `true` | 用账号的在线模型列表叠加内置目录 |
+| `proxyUrl` | `''` | HTTP(S) 代理地址；留空使用环境变量，再尝试 Windows 静态系统代理 |
+| `systemProxy` | `true` | 未指定代理时读取 Windows 当前用户的静态系统代理；不影响 macOS／Linux |
 
 不要同时在 `llm-pi-ai.providers` 下添加 `xai` 条目；重复的路由所有权会被
 显式诊断并拒绝。

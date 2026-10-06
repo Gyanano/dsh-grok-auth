@@ -1,39 +1,90 @@
-/**
- * Environment HTTP proxy installation for the running host process.
- *
- * Node's built-in fetch (undici) does not honour `HTTP_PROXY`/`HTTPS_PROXY`
- * environment variables, while this machine's other tools (curl, python,
- * the grok CLI) all route through the local proxy — so on such a network
- * every OAuth or LLM request from this plugin would fail with a connect
- * timeout. Installing an `EnvHttpProxyAgent` as the global dispatcher makes
- * the host behave like the rest of the system: proxy variables are honoured
- * (with `NO_PROXY` bypassing for localhost and friends), and on a machine
- * with no proxy variables set this is a no-op.
- *
- * @module dsh-grok-auth/env-proxy
- */
+import { Agent, EnvHttpProxyAgent, getGlobalDispatcher, setGlobalDispatcher, type Dispatcher, type buildConnector } from 'undici'
+import { isLoopback, parseWindowsProxy, proxyUrl, readWindowsProxy, windowsProxyBypass } from './windows-proxy.ts'
+import type { WindowsProxySettings } from './windows-proxy.ts'
 
-import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici'
+interface ProxyOptions {
+  proxyUrl?: string
+  systemProxy?: boolean
+  platform?: NodeJS.Platform
+  env?: NodeJS.ProcessEnv
+  readWindowsProxy?: () => Promise<WindowsProxySettings>
+  requestTls?: buildConnector.BuildOptions
+}
 
-let installed = false
+/** pi-ai uses native fetch, so routing must be installed on the host dispatcher. */
+export async function installHttpProxy(
+  log: (message: string) => void,
+  options: ProxyOptions = {},
+): Promise<() => Promise<void>> {
+  const env = options.env ?? process.env
+  let http = env.http_proxy ?? env.HTTP_PROXY ?? ''
+  let https = env.https_proxy ?? env.HTTPS_PROXY ?? ''
+  let bypass = isLoopback
+  let source = 'environment HTTP proxy'
+  let system = false
+  if (options.proxyUrl?.trim()) {
+    http = https = proxyUrl(options.proxyUrl.trim())
+    source = 'configured HTTP proxy'
+  } else if (!http && !https) {
+    if ((options.platform ?? process.platform) !== 'win32' || options.systemProxy === false) {
+      return async () => {}
+    }
+    let settings: WindowsProxySettings
+    try {
+      settings = await (options.readWindowsProxy ?? (() => readWindowsProxy(env)))()
+    } catch {
+      log('llm-grok-auth: could not read Windows system proxy; using the existing network configuration')
+      return async () => {}
+    }
+    if (!settings.enabled) {
+      if (settings.autoConfigUrl) log('llm-grok-auth: automatic proxy scripts (PAC) are unsupported; configure a static HTTP proxy or HTTP_PROXY / HTTPS_PROXY')
+      return async () => {}
+    }
+    try {
+      const proxies = parseWindowsProxy(settings.server)
+      http = proxies.http ?? ''
+      https = proxies.https ?? ''
+    } catch {
+      log('llm-grok-auth: invalid Windows static HTTP proxy; using the existing network configuration')
+      return async () => {}
+    }
+    if (!http && !https) return async () => {}
+    bypass = windowsProxyBypass(settings.bypass)
+    source = 'Windows system HTTP proxy'
+    system = true
+  }
 
-/**
- * Install the env-proxy dispatcher once, when the process environment names
- * a proxy. Safe to call at any plugin load; repeated calls are no-ops.
- * @param log - diagnostic sink (never receives proxy credentials).
- */
-export function installEnvHttpProxy(log: (message: unknown) => void): void {
-  if (installed) return
-  installed = true
-  const proxy = process.env.HTTPS_PROXY ?? process.env.https_proxy
-    ?? process.env.HTTP_PROXY ?? process.env.http_proxy
-  if (proxy === undefined || proxy.length === 0) return
+  const direct = new Agent()
+  let agent: Dispatcher
   try {
-    // EnvHttpProxyAgent reads the proxy and NO_PROXY variables per request,
-    // so a change takes effect without re-installing.
-    setGlobalDispatcher(new EnvHttpProxyAgent())
-    log('llm-grok-auth: routing outbound requests through the environment HTTP proxy')
-  } catch (error) {
-    log(error)
+    agent = new EnvHttpProxyAgent({
+      httpProxy: http,
+      httpsProxy: https,
+      ...(options.requestTls ? { requestTls: options.requestTls } : {}),
+      // Preserve dynamic NO_PROXY handling for the real process environment.
+      ...(options.env ? { noProxy: env.no_proxy ?? env.NO_PROXY ?? '' } : {}),
+    })
+  } catch {
+    await direct.destroy()
+    throw new Error('Could not initialize HTTP proxy; check the proxy address')
+  }
+  const dispatcher = direct.compose(dispatch => (request, handler) => {
+    const url = new URL(String(request.origin))
+    // A protocol omitted from a Windows mapping stays direct; env HTTPS_PROXY
+    // keeps Undici's existing fallback to HTTP_PROXY.
+    if (bypass(url) || (system && !(url.protocol === 'https:' ? https : http))) {
+      return dispatch(request, handler)
+    }
+    return agent.dispatch(request, handler)
+  })
+  const previous = getGlobalDispatcher()
+  setGlobalDispatcher(dispatcher)
+  log(`llm-grok-auth: routing outbound requests through the ${source}`)
+  let disposed = false
+  return async () => {
+    if (disposed) return
+    disposed = true
+    if (getGlobalDispatcher() === dispatcher) setGlobalDispatcher(previous)
+    await Promise.all([direct.destroy(), agent.destroy()])
   }
 }
